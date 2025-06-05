@@ -1,11 +1,13 @@
+// src/main/java/br/com/kandu/config/SecurityConfig.java
 package br.com.kandu.config;
 
 import br.com.kandu.security.jwt.JwtAuthenticationFilter;
-import jakarta.servlet.http.HttpServletResponse; // Import para HttpServletResponse
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // NOVO IMPORT
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // HABILITA @PreAuthorize, @PostAuthorize, @Secured
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -36,7 +39,6 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Configurar o AuthenticationEntryPoint para retornar 401
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) ->
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Não autorizado: Acesso negado ou token inválido.")
@@ -47,6 +49,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/cadastrar").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/api/test/public").permitAll()
+                        // Não precisamos mais de uma regra específica para /api/empresas/** aqui,
+                        // pois @PreAuthorize cuidará disso no controller.
+                        // Mas se quisesse fazer a nível de HttpSecurity:
+                        // .requestMatchers("/api/empresas/**").hasAuthority("ADM")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

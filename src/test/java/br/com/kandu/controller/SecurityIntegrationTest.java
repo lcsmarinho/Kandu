@@ -4,7 +4,9 @@ package br.com.kandu.controller;
 import br.com.kandu.dto.LoginDTO;
 import br.com.kandu.dto.TokenDTO;
 import br.com.kandu.dto.UsuarioCadastroDTO;
-import br.com.kandu.repository.UsuarioRepository; // Importar o repositório
+import br.com.kandu.entity.Empresa; // Novo import
+import br.com.kandu.repository.EmpresaRepository; // Novo import
+import br.com.kandu.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,7 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional; // Pode ser útil para garantir a limpeza
+// import org.springframework.transaction.annotation.Transactional; // Se precisar
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,8 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-// O @DirtiesContext ainda é bom para garantir que o contexto geral seja resetado,
-// mas a limpeza explícita do repositório dá controle mais fino sobre os dados.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class SecurityIntegrationTest {
 
@@ -37,37 +37,49 @@ public class SecurityIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired // Injete o UsuarioRepository
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired // Injete o EmpresaRepository
+    private EmpresaRepository empresaRepository;
+
     private String jwtToken;
+    private final String codigoInscricaoTesteGlobal = "INTEG_EMP001"; // Código global para o teste
 
     @BeforeEach
-        // @Transactional // Adicionar @Transactional pode ajudar a garantir que o deleteAll() seja efetivo
-        // antes das operações seguintes dentro da mesma transação de teste,
-        // especialmente se houver lazy loading ou outras complexidades.
-        // Para operações simples de deleteAll + save, pode não ser estritamente necessário
-        // com H2 e ddl-auto=create-drop (implícito pelo @SpringBootTest com H2).
+        // @Transactional // Pode ser útil se houver problemas de transação com deleteAll
     void setUp() throws Exception {
-        // Limpar a tabela de usuários ANTES de cada execução do setUp.
-        // Isso garante que o cadastro do 'integtestuser' não falhe por duplicidade.
+        // Limpar dados de testes anteriores para garantir isolamento
         usuarioRepository.deleteAll();
-        // Se você tiver outras entidades relacionadas que precisam ser limpas, faça aqui também.
+        empresaRepository.deleteAll();
 
-        // Cadastrar um usuário para os testes
+        // 1. Criar uma empresa para o teste
+        Empresa empresaParaTeste = Empresa.builder()
+                .nome("Empresa de Teste de Integração Setup")
+                .codigoInscricao(codigoInscricaoTesteGlobal)
+                .build();
+        // Como não temos endpoint de criar empresa ainda (ou não queremos depender dele aqui),
+        // podemos salvar diretamente via repositório para o setup do teste.
+        // Em um teste de integração mais puro, você chamaria o endpoint de criação de empresa.
+        empresaRepository.save(empresaParaTeste);
+
+
+        // 2. Cadastrar um usuário associado a essa empresa
         UsuarioCadastroDTO cadastroDTO = new UsuarioCadastroDTO();
         cadastroDTO.setNomeCompleto("Usuário de Integração");
         cadastroDTO.setNomeUsuario("integtestuser");
         cadastroDTO.setEmail("integ@example.com");
         cadastroDTO.setSenha("senha123");
+        cadastroDTO.setCodigoInscricao(codigoInscricaoTesteGlobal); // Usar o código da empresa criada
 
+        // Realiza a chamada ao endpoint de cadastro
         mockMvc.perform(post("/auth/cadastrar")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(cadastroDTO)))
-                .andDo(print()) // Para debug, pode ser removido depois
-                .andExpect(status().isCreated()); // Linha 49
+                .andDo(print()) // Para debug
+                .andExpect(status().isCreated());
 
-        // Fazer login para obter um token
+        // 3. Fazer login para obter um token para os testes protegidos
         LoginDTO loginDTO = new LoginDTO();
         loginDTO.setNomeUsuario("integtestuser");
         loginDTO.setSenha("senha123");
@@ -83,6 +95,8 @@ public class SecurityIntegrationTest {
         this.jwtToken = tokenDTO.getToken();
     }
 
+    // ... (seus métodos de teste @Test continuam aqui) ...
+    // Exemplo:
     @Test
     @DisplayName("Deve acessar endpoint protegido com token JWT válido")
     void deveAcessarEndpointProtegidoComTokenValido() throws Exception {
@@ -118,9 +132,8 @@ public class SecurityIntegrationTest {
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginDTORuim)))
-                .andExpect(status().isUnauthorized()); // Espera 401 porque as credenciais são inválidas
+                .andExpect(status().isUnauthorized());
     }
-
     @Test
     @DisplayName("Deve acessar endpoint público de teste /api/test/public sem autenticação")
     void deveAcessarEndpointPublicoDeTeste() throws Exception {
