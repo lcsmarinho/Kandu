@@ -5,6 +5,7 @@ import br.com.kandu.enums.StatusOS; // <-- Import que estava faltando
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import java.util.List; // Adicionar import
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -60,4 +61,8 @@ public class OrdemDeServico {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsavel_id")
     private Usuario responsavel;
+
+    // Relacionamento com a tabela de junção ParticipanteOS
+    @OneToMany(mappedBy = "ordemDeServico", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ParticipanteOS> participantes;
 }

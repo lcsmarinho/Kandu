@@ -4,6 +4,7 @@ package br.com.kandu.entity;
 import br.com.kandu.enums.NivelHierarquia;
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.List;
 
 @Entity
 @Table(name = "usuarios", uniqueConstraints = {
@@ -50,4 +51,7 @@ public class Usuario {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
+
+    @OneToMany(mappedBy = "usuario")
+    private List<ParticipanteOS> participacoesEmOS;
 }

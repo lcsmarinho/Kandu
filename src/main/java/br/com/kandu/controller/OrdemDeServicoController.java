@@ -26,7 +26,7 @@ public class OrdemDeServicoController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('COMUM') or hasAuthority('SUPERVISOR') or hasAuthority('GESTOR') or hasAuthority('DIRETOR') or hasAuthority('ADM')")
+    @PreAuthorize("isAuthenticated()") // Qualquer utilizador autenticado pode criar
     public ResponseEntity<?> criarOS(@RequestBody OrdemDeServicoCriacaoDTO dto) {
         try {
             OrdemDeServico novaOS = osService.criarOS(dto);
@@ -37,7 +37,7 @@ public class OrdemDeServicoController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()") // Qualquer utilizador autenticado pode listar (a lógica de serviço faz o filtro)
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<OrdemDeServicoResponseDTO>> listarOS() {
         List<OrdemDeServico> listaOS = osService.listarOS();
         List<OrdemDeServicoResponseDTO> dtos = listaOS.stream()
@@ -47,7 +47,7 @@ public class OrdemDeServicoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()") // A lógica de visibilidade está no serviço
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> buscarOSPorId(@PathVariable Long id) {
         try {
             OrdemDeServico os = osService.buscarOSPorId(id);
@@ -60,18 +60,40 @@ public class OrdemDeServicoController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPERVISOR', 'GESTOR', 'DIRETOR', 'ADM')") // Apenas supervisores ou superiores podem deletar/arquivar
+    @PreAuthorize("hasAnyAuthority('SUPERVISOR', 'GESTOR', 'DIRETOR', 'ADM')")
     public ResponseEntity<Void> deletarOS(@PathVariable Long id) {
         try {
             osService.deletarOS(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
-            // Pode ser not found ou forbidden
             return ResponseEntity.notFound().build();
         }
     }
 
-    // Método helper para mapear Entidade para DTO de resposta
+    // --- NOVOS ENDPOINTS PARA PARTICIPANTES ---
+
+    @PostMapping("/{osId}/participantes/{usuarioId}")
+    @PreAuthorize("hasAnyAuthority('SUPERVISOR', 'GESTOR', 'DIRETOR', 'ADM')")
+    public ResponseEntity<?> adicionarParticipante(@PathVariable Long osId, @PathVariable Long usuarioId) {
+        try {
+            osService.adicionarParticipante(osId, usuarioId);
+            return ResponseEntity.ok().body("Participante adicionado com sucesso.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{osId}/participantes/{participanteId}")
+    @PreAuthorize("hasAnyAuthority('SUPERVISOR', 'GESTOR', 'DIRETOR', 'ADM')")
+    public ResponseEntity<?> removerParticipante(@PathVariable Long osId, @PathVariable Long participanteId) {
+        try {
+            osService.removerParticipante(osId, participanteId);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     private OrdemDeServicoResponseDTO mapToResponseDTO(OrdemDeServico os) {
         return OrdemDeServicoResponseDTO.builder()
                 .id(os.getId())
